@@ -10,7 +10,7 @@ This repository provides a Python code to extract a **3D contact-angle distribut
 - **2 = liquid**
 - **3 = gas**
 
-Please refer to the image data we have provided.
+Please refer to the image data we have provided. https://doi.org/10.6084/m9.figshare.30885293
 
 The script outputs:
 - Contact-angle list and summary statistics
