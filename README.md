@@ -12,6 +12,16 @@ This Python code quantifies local three-dimensional contact angles from segmente
 
 The workflow identifies solid-water and water-gas interfaces, detects candidate three-phase contact points, filters unreliable local configurations, fits local interface planes using singular value decomposition (SVD), orients the corresponding interface normals from the phase labels, and calculates the contact angle from the angle between the two oriented normal vectors. The resulting contact-angle distribution, spatial coordinates, local phase fractions, rejection statistics, and summary statistics are exported for subsequent analysis.
 
+### Associated paper and citation
+
+This code implements and supports the physics-constrained contact-angle extraction workflow reported in:
+
+> Guo, Z., Jin, F., Wang, K., Zhuang, Y., Suo, S., Torres, S. A. G., & Lei, L. (2026). *Physics-constrained contact angle extraction in 3D porous media*. SSRN preprint. Available at [SSRN](https://ssrn.com/abstract=6641861) or [https://doi.org/10.2139/ssrn.6641861](https://doi.org/10.2139/ssrn.6641861).
+
+The code helps users identify solid-water and water-gas interfaces and candidate three-phase contact points in segmented 3D CT images; reject unreliable or non-physical local configurations; fit local interface planes and orient their normals; calculate spatially resolved contact angles; and export contact-angle distributions, coordinates, local phase fractions, quality-control diagnostics, and summary statistics. These outputs can support quantitative wettability characterization, comparisons among treatment conditions or representative-volume scales, and the preparation of robust inputs for models of capillarity-driven transport, interfacial-area evolution, and interface-controlled mass transfer or reactions in porous media.
+
+If you use this code in your research, please cite the preprint above. Thank you for using the repository, for following our work, and for citing our article.
+
 ### Phase labels and coordinates
 
 The default segmented-image labels are:
@@ -122,7 +132,7 @@ python -m unittest discover -s tests -v
 
 ### Licence and citation
 
-The code is released under the [MIT License](LICENSE). If you use this repository, cite the code repository and the associated dataset. A manuscript citation can be added here when its final bibliographic information and DOI are available.
+The code is released under the [MIT License](LICENSE). If you use this repository, please cite the associated SSRN preprint, the code repository, and the Figshare dataset when the dataset is used.
 
 ## 中文
 
@@ -131,6 +141,16 @@ The code is released under the [MIT License](LICENSE). If you use this repositor
 本 Python 代码用于从分割后的多相多孔介质 CT 图像中定量提取局部三维接触角。
 
 该流程识别固体–水和水–气界面，检测候选三相接触点，过滤不可靠的局部构型，利用奇异值分解（SVD）拟合局部界面平面，根据相标签确定界面法向量方向，并通过两个定向法向量之间的夹角计算接触角。最终导出接触角分布、空间坐标、局部相体积分数、拒绝原因统计和汇总统计结果，供后续统计分析使用。
+
+### 相关论文与引用
+
+本代码实现并支持以下论文所报告的物理约束三维接触角提取流程：
+
+> Guo, Z., Jin, F., Wang, K., Zhuang, Y., Suo, S., Torres, S. A. G., & Lei, L. (2026). *Physics-constrained contact angle extraction in 3D porous media*. SSRN 预印本。可通过 [SSRN](https://ssrn.com/abstract=6641861) 或 [https://doi.org/10.2139/ssrn.6641861](https://doi.org/10.2139/ssrn.6641861) 获取。
+
+该代码可帮助使用者在分割后的三维 CT 图像中识别固体–水界面、水–气界面和候选三相接触点，剔除不可靠或非物理的局部构型，拟合局部界面平面并确定法向量方向，计算具有空间坐标的局部三维接触角，同时导出接触角分布、坐标、局部相体积分数、质量控制诊断和汇总统计。这些结果可用于多孔介质润湿性的定量表征、不同处理条件或代表性体积尺度之间的比较，并可为毛细驱动输运、界面面积演化以及界面控制的传质或反应模型提供稳健输入。
+
+如果您在研究中使用了本代码，请引用上述预印本。感谢您使用本仓库、关注我们的工作并引用我们的文章。
 
 ### 相标签与坐标约定
 
@@ -242,4 +262,4 @@ python -m unittest discover -s tests -v
 
 ### 开源许可与引用
 
-本项目采用 [MIT License](LICENSE) 开源。如使用本仓库，请引用代码仓库及关联数据集。待论文最终书目信息和 DOI 确定后，可在此补充正式论文引用。
+本项目采用 [MIT License](LICENSE) 开源。如使用本仓库，请引用相关 SSRN 预印本和代码仓库；如使用了 Figshare 数据集，也请同时引用该数据集。

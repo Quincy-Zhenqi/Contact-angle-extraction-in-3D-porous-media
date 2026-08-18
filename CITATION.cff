@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the associated SSRN preprint below."
+title: "Contact-angle extraction in 3D porous media"
+type: software
+authors:
+  - family-names: Guo
+    given-names: Zhenqi
+repository-code: "https://github.com/Quincy-Zhenqi/Contact-angle-extraction-in-3D-porous-media"
+license: MIT
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Guo
+      given-names: Zhenqi
+    - family-names: Jin
+      given-names: Feiyan
+    - family-names: Wang
+      given-names: Kun
+    - family-names: Zhuang
+      given-names: Yajuan
+    - family-names: Suo
+      given-names: Si
+    - family-names: Torres
+      given-names: Sergio Andres Galindo
+    - family-names: Lei
+      given-names: Liang
+  title: "Physics-constrained contact angle extraction in 3D porous media"
+  year: 2026
+  month: 4
+  doi: "10.2139/ssrn.6641861"
+  url: "https://ssrn.com/abstract=6641861"
+  notes: "SSRN preprint, posted 24 April 2026."
