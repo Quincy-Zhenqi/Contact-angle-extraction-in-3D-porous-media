@@ -21,3 +21,24 @@ results/
 *_contact_angle_*.tiff
 *_effective_config.json
 batch_processing_summary.csv
+
+# Segmented image volumes, local dependencies and run artefacts
+*.tif
+*.tiff
+*.npy
+*.npz
+*.csv.gz
+*.log
+contact_angle_results/
+summary.json
+.venv*/
+
+# Local credentials and unpublished working documents
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.docx
+~$*

@@ -1,265 +1,99 @@
-# Contact-angle extraction in 3D porous media
+# Contact angle extraction with geometrical and morphological constraints in 3D porous media
 
-![Physics-constrained contact-angle extraction workflow](assets/contact-angle-workflow.png)
+This Python code measures local contact angles along solid–liquid–gas contact lines in segmented CT volumes. It exports both the geometrically computable angles and a quality-controlled subset for comparing wettability across samples.
 
-[English](#english) | [中文](#中文)
+本程序沿分割 CT 体数据中的固–液–气三相接触线测量局部接触角，输出几何可计算的全部角度及其质量筛选子集，用于比较样品间的润湿性。
 
-## English
+## Measurement / 测量方法
 
-### Purpose
+1. Read a 3D integer-labelled TIFF stack in **(z, y, x)** order. Solid = 1, liquid = 2, gas = 3, exterior background = 4 (optional). All three scientific phases must occur. Input labels are read-only. The study uses **9.14 µm isotropic voxels**. The implementation requires isotropic spacing.
 
-This Python code quantifies local three-dimensional contact angles from segmented multiphase CT images of porous media.
+   读取 **(z, y, x)** 顺序的三维整数标签 TIFF。固体、液体、气体分别为 1、2、3，均须出现，外部背景可标为 4。程序只读原始标签。研究数据的各向同性体素边长为 **9.14 µm**，实现要求三轴间距相同。
 
-The workflow identifies solid-water and water-gas interfaces, detects candidate three-phase contact points, filters unreliable local configurations, fits local interface planes using singular value decomposition (SVD), orients the corresponding interface normals from the phase labels, and calculates the contact angle from the angle between the two oriented normal vectors. The resulting contact-angle distribution, spatial coordinates, local phase fractions, rejection statistics, and summary statistics are exported for subsequent analysis.
+2. Represent both interfaces by liquid voxel centres. A raw candidate touches both solid and gas through voxel faces. In the 9³ fitting cube, select the candidate-connected sheet of each interface separately (18-connectivity). The surrounding 11³ geometry envelope must lie inside the array and contain only scientific labels. Fit each plane by centred SVD using all selected points. At least three non-collinear points and a resolvable second singular value are required.
 
-### Associated paper and citation
+   两个界面均用液相体素中心表示，同时与固、气两相面邻接的液相体素构成原始候选点。在 9³ 拟合立方体内分别取与候选点 18 邻接连通的界面片。外围 11³ 几何支撑区须完整且仅含三相标签。对全部入选点做中心化 SVD，至少需要三个非共线点且第二奇异值须可分辨。
 
-This code implements and supports the physics-constrained contact-angle extraction workflow reported in:
+3. Use local 6-connected phase centroids to orient unit normals **nLG** (liquid → gas) and **nSL** (solid → liquid). Where the centre lies outside a phase, use the largest face-adjacent local component. **G** contains candidates with a finite **θ = arccos(nLG · nSL)** in degrees (0–180°), including obtuse angles. Normal orientation requires a defined, nonzero projection. **Q** takes rows of G that pass all 23 checks below. The stored angle is copied from G.
 
-> Guo, Z., Jin, F., Wang, K., Zhuang, Y., Suo, S., Torres, S. A. G., & Lei, L. (2026). *Physics-constrained contact angle extraction in 3D porous media*. SSRN preprint. Available at [SSRN](https://ssrn.com/abstract=6641861) or [https://doi.org/10.2139/ssrn.6641861](https://doi.org/10.2139/ssrn.6641861).
+   用局部 6 邻接相组分的质心将法向量分别定向为液→气、固→液。中心位于该相之外时，取与中心面邻接的最大局部组分。**G** 包含定向投影有定义且非零、能计算有限夹角的候选点，角度范围为 0–180°，保留钝角。**Q** 从 G 中选出以下 23 项全部通过的点，每个点沿用 G 中的角度。
 
-The code helps users identify solid-water and water-gas interfaces and candidate three-phase contact points in segmented 3D CT images; reject unreliable or non-physical local configurations; fit local interface planes and orient their normals; calculate spatially resolved contact angles; and export contact-angle distributions, coordinates, local phase fractions, quality-control diagnostics, and summary statistics. These outputs can support quantitative wettability characterization, comparisons among treatment conditions or representative-volume scales, and the preparation of robust inputs for models of capillarity-driven transport, interfacial-area evolution, and interface-controlled mass transfer or reactions in porous media.
+## Acceptance criteria / 接受条件
 
-If you use this code in your research, please cite the preprint above. Thank you for using the repository, for following our work, and for citing our article.
+Each raw candidate receives an independent `pass`, `fail` or `not_evaluated` for each criterion. Unavailable measurements can coexist with failures on the same candidate. Each paired `wg` / `sw` entry below counts twice (liquid–gas / solid–liquid).
+每个候选点的每项条件均独立记录通过、失败或不可评价。同一点可同时存在失败项和不可评价项。下表中每对 `wg` / `sw` 分别对应液–气和固–液界面，计作两项。
 
-### Phase labels and coordinates
+| Criterion / 条件 | Default / 默认判据 |
+|---|---|
+| `numerical_geometry` | Finite oriented angle (membership in G) / 有限定向夹角，定义 G |
+| `topology` | Six face neighbours include all three phases, excluding the centre / 中心之外的六个面邻居含三相 |
+| `legacy_margin` | Distance to each array face ≥15 voxels / 距每一数组边界至少 15 体素 |
+| `sphere` | Complete radius-15 composition sphere containing labels 1–3 only / 半径 15 的组分球完整且仅含三相 |
+| `component_size` | Liquid and largest face-adjacent gas components each ≥50 voxels, global 6-connectivity / 液相及面邻接最大气相组分均 ≥50 体素，全局 6 邻接 |
+| `candidate_density` | ≤3 face-adjacent raw candidates / 面邻接原始候选点数 ≤3 |
+| `dense_guard` | Dense = ≥4 raw-candidate face neighbours. Core = dense with ≥4 dense face neighbours. Chebyshev distance to core >2 voxels / 稠密点至少有 4 个候选面邻居，核心点还须有至少 4 个稠密面邻居，距核心的切比雪夫距离须 >2 |
+| `solid_count`, `liquid_count`, `gas_count` | Each phase ≥20 voxels in the complete 11³ count cube / 完整 11³ 计数立方体中每相 ≥20 体素 |
+| `solid_fraction` | 0.30 ≤ solid fraction ≤0.70 in the radius-15 sphere / 组分球中固相比例含上下限 |
+| `liquid_fraction`, `gas_fraction` | Each finite and ≥0, upper bound disabled / 各自有限且 ≥0，未启用上限 |
+| `wg_interface_size`, `sw_interface_size` | Each global 18-connected interface ≥15 voxels / 两个全局 18 邻接界面组分各 ≥15 体素 |
+| `wg_plane_points`, `sw_plane_points` | Each local sheet ≥15 fitting points in the 9³ cube / 9³ 窗内两个局部界面片各 ≥15 个拟合点 |
+| `wg_plane_rms`, `sw_plane_rms` | Orthogonal plane RMS ≤1.0 reference voxel / 正交平面残差均方根 ≤1.0 个参考体素 |
+| `wg_singular_value_ratio`, `sw_singular_value_ratio` | s3/s2 ≤0.30 for each fit / 两个拟合的奇异值比均 ≤0.30 |
+| `wg_orientation_alignment`, `sw_orientation_alignment` | Absolute projection of each unit normal onto its unit centroid direction ≥0.05 / 单位法向量在对应质心连线单位方向上的投影绝对值 ≥0.05 |
 
-The default segmented-image labels are:
+## Run one image / 运行单个图像
 
-- `1`: solid
-- `2`: water
-- `3`: gas
+In a virtual environment (tested with 64-bit Python 3.8.2), run the following from the repository directory. The requirements file pins NumPy, SciPy, pandas and tifffile. Supply your segmented TIFF and choose a new output directory for each run.
 
-The TIFF array is indexed internally as `(z, y, x)`. Exported point tables use `(X, Y, Z)` columns. Labels can be changed in the JSON configuration file, but the input must contain three distinct phases.
+在虚拟环境中从仓库目录运行以下命令。依赖文件固定了 NumPy、SciPy、pandas 和 tifffile 的版本，已用 64 位 Python 3.8.2 验证。将输入路径替换为自己的分割 TIFF，每次使用新的输出目录。
 
-### Workflow
-
-1. Remove water and gas components smaller than configurable 3D voxel-count thresholds.
-2. Extract water-gas and solid-water interface voxels using six-neighbour face connectivity.
-3. Detect water voxels adjacent to both other phases as candidate three-phase contact points.
-4. Reject candidates with unreliable neighbourhood density, phase counts, phase fractions, interface support, plane fits, or normal orientation.
-5. Fit local interface planes by SVD and retain fits satisfying RMS-residual and singular-value-ratio thresholds.
-6. Orient the water-gas normal from water toward gas and the solid-water normal from solid toward water. At a discrete three-phase line, the probe can enter the third phase; the original phase-pair fallback convention is enabled by default and can be disabled in the configuration.
-7. Calculate the local angle between the two oriented normals and export the results.
-
-### Requirements
-
-- Python 3.8 or newer
-- NumPy
-- SciPy
-- pandas
-- Matplotlib
-- tifffile
-
-Install the dependencies in a virtual environment:
-
-```bash
-python -m venv .venv
+```sh
 python -m pip install -r requirements.txt
+python -c "from contact_angle_extraction import run_image; run_image('data/sample.tif', 'results/run01')"
 ```
 
-### Quick start
+`run_image` uses the defaults listed in `example_config.json`, including all local fitting points (`max_plane_points: null`). To study a parameter change, load your configuration and call `calculate` directly.
 
-Process one segmented TIFF stack:
+`run_image` 使用 `example_config.json` 所列的默认参数，其中 `max_plane_points: null` 表示使用全部局部拟合点。研究参数变化时，可按下例载入配置并调用 `calculate`。
 
-```bash
-python contact_angle_extraction.py path/to/segmented_volume.tif --output-dir results
+```python
+import json
+import tifffile
+from contact_angle_extraction import Parameters, calculate
+
+with open("example_config.json", encoding="utf-8") as f:
+    cfg = Parameters(**json.load(f))
+features, accepted, states, summary = calculate(tifffile.imread("data/sample.tif"), cfg)
 ```
 
-Use the included configuration and a reproducible random seed:
+## Outputs / 输出
 
-```bash
-python contact_angle_extraction.py path/to/segmented_volume.tif \
-  --output-dir results \
-  --config example_config.json \
-  --seed 42
-```
+| File | Contents / 内容 |
+|---|---|
+| `candidate_features.csv.gz` | Every raw candidate, stable within-volume ID, original zero-based z/y/x voxel indices, phase counts/fractions, plane and orientation diagnostics, angle, Q flag and reasons / 全部原始候选及其卷内 ID、从零开始的原图坐标、相计数及比例、拟合与定向诊断、角度、Q 标记及原因 |
+| `criterion_states.csv.gz` | 23 states per raw candidate in original feature-row order / 按特征表原始行序保存各候选点的 23 项状态 |
+| `G.csv.gz`, `Q.csv.gz` | Feature rows in G and Q with the same coordinates and angles / 分别收录 G、Q 对应的特征行、坐标与角度 |
+| `summary.json` | G and Q counts, fractions of raw candidates, mean, median, population SD (ddof=0), quartiles, IQR, P05/P95 and fractions below 10° or above 170° / 两集合的数量、占原始候选比例、均值、中位数、总体标准差、四分位数及四分位距、P05/P95 和两端比例 |
 
-Process all TIFF files in a directory:
+Normals and centroids use **x, y, z** component suffixes. Centroid coordinates and plane RMS are in reference voxels. Before filtering or sorting the state table, attach `candidate_id, z, y, x` from the same run’s unsorted feature table in the original row order. For Table 2, calculate adjusted skewness with `scipy.stats.skew(angles, bias=False)` on Q’s `contact_angle_degrees` when at least three values are present and the angles vary.
 
-```bash
-python contact_angle_extraction.py path/to/tiff_directory \
-  --output-dir batch_results \
-  --recursive
-```
+法向量和质心分量的后缀为 **x、y、z**，质心坐标及平面 RMS 以参考体素计。状态表按同次运行的原始特征表行序排列；筛选或排序前，先逐行附上后者的 `candidate_id, z, y, x`。复算 Table 2 时，若 Q 中有至少三个角且角度不全相同，可对 `contact_angle_degrees` 列调用 `scipy.stats.skew(angles, bias=False)` 获得校正偏度。
 
-Existing generated files are protected by default. Add `--overwrite` only when replacement is intended.
+## Tests / 测试
 
-### Configuration
+The tests generate perpendicular interfaces with a known 90° angle (43 candidates, 33 in G and 13 in Q). The optional second command compares the repository and Supplementary Material (SI) on this input, candidate by candidate. Supply your local SI document. Add `--tiff data/sample.tif` to compare another volume.
 
-All numerical phase labels and quality-control thresholds are defined by `ContactAngleConfig` and can be overridden with [`example_config.json`](example_config.json). Important parameters include:
+测试生成夹角为 90° 的双界面，预期有 43 个候选点，其中 G 有 33 个、Q 有 13 个。可选的第二条命令从本地补充材料（SI）独立提取源码，逐点比较两份程序的输出。附加 `--tiff data/sample.tif` 可核对其他体数据。
 
-| Parameter | Default | Meaning |
-| --- | ---: | --- |
-| `min_water_component_voxels` | 50 | Minimum retained 3D water-component size |
-| `min_gas_component_voxels` | 50 | Minimum retained 3D gas-component size |
-| `sphere_radius` | 15 | Radius used for local phase-fraction calculations |
-| `patch_window_radius` | 4 | Half-width of the local interface-fitting window |
-| `min_patch_points` | 15 | Minimum interface points required for each plane fit |
-| `max_plane_rms` | 1.0 | Maximum accepted RMS distance from a fitted plane |
-| `max_singular_value_ratio` | 0.3 | Maximum accepted smallest/middle singular-value ratio |
-| `normal_probe_steps` | `[1, 2, 3]` | Voxel distances used to orient interface normals |
-| `allow_third_phase_orientation_fallback` | `true` | Preserve the original normal-orientation fallback when a probe crosses the third phase |
-| `save_angle_map` | `true` | Export a float32 TIFF with angles at accepted points |
-
-Thresholds are expressed in voxels and therefore depend on image resolution. They should be justified and, when necessary, recalibrated for a new CT resolution or segmentation workflow.
-
-### Outputs
-
-Each input produces:
-
-- a per-point CSV containing `(X, Y, Z)`, contact angle, and local phase fractions;
-- a summary-statistics CSV;
-- a rejection-reason CSV;
-- a contact-angle histogram TIFF and its numerical CSV;
-- an effective-configuration JSON for reproducibility;
-- an optional compressed NPZ bundle containing coordinates, normals, phase fractions, and diagnostic point sets;
-- an optional float32 contact-angle map TIFF with the same shape as the input volume.
-
-The angle-map TIFF can be much larger than an 8-bit segmented input. Set `save_angle_map` to `false` if storage is limited.
-
-### Data
-
-The associated dataset is *3D contact angle distribution* on Figshare ([DOI: 10.6084/m9.figshare.30885293.v1](https://doi.org/10.6084/m9.figshare.30885293.v1), CC BY 4.0). Research image data are not stored in this code repository.
-
-### Validation
-
-The included test constructs two orthogonal planar interfaces with a known 90° contact angle and verifies the full TIFF-to-output workflow:
-
-```bash
+```sh
 python -m unittest discover -s tests -v
+python tests/compare_si.py "Supplementary Material_2026.11.20.docx"
 ```
 
-### Licence and citation
+## Research data and citation / 数据与引用
 
-The code is released under the [MIT License](LICENSE). If you use this repository, please cite the associated SSRN preprint, the code repository, and the Figshare dataset when the dataset is used.
+For the measurement assumptions and choice of thresholds, see manuscript §§2.3–2.4 and SI Tables S1–S2. The spacing, fitting window and segmentation affect the inferred angles. Please cite the manuscript below and record the Git commit used for your analysis.
 
-## 中文
+测量假设与阈值选择见正文第 2.3–2.4 节和 SI 表 S1–S2。体素间距、拟合窗口和分割结果均会影响角度估计。欢迎引用以下稿件，并注明分析所用的 Git 提交号。[Research data on Figshare / 研究数据](https://figshare.com/articles/figure/3D_contact_angle_distribution_/30885293)
 
-### 用途
-
-本 Python 代码用于从分割后的多相多孔介质 CT 图像中定量提取局部三维接触角。
-
-该流程识别固体–水和水–气界面，检测候选三相接触点，过滤不可靠的局部构型，利用奇异值分解（SVD）拟合局部界面平面，根据相标签确定界面法向量方向，并通过两个定向法向量之间的夹角计算接触角。最终导出接触角分布、空间坐标、局部相体积分数、拒绝原因统计和汇总统计结果，供后续统计分析使用。
-
-### 相关论文与引用
-
-本代码实现并支持以下论文所报告的物理约束三维接触角提取流程：
-
-> Guo, Z., Jin, F., Wang, K., Zhuang, Y., Suo, S., Torres, S. A. G., & Lei, L. (2026). *Physics-constrained contact angle extraction in 3D porous media*. SSRN 预印本。可通过 [SSRN](https://ssrn.com/abstract=6641861) 或 [https://doi.org/10.2139/ssrn.6641861](https://doi.org/10.2139/ssrn.6641861) 获取。
-
-该代码可帮助使用者在分割后的三维 CT 图像中识别固体–水界面、水–气界面和候选三相接触点，剔除不可靠或非物理的局部构型，拟合局部界面平面并确定法向量方向，计算具有空间坐标的局部三维接触角，同时导出接触角分布、坐标、局部相体积分数、质量控制诊断和汇总统计。这些结果可用于多孔介质润湿性的定量表征、不同处理条件或代表性体积尺度之间的比较，并可为毛细驱动输运、界面面积演化以及界面控制的传质或反应模型提供稳健输入。
-
-如果您在研究中使用了本代码，请引用上述预印本。感谢您使用本仓库、关注我们的工作并引用我们的文章。
-
-### 相标签与坐标约定
-
-默认分割标签为：
-
-- `1`：固体
-- `2`：水
-- `3`：气体
-
-TIFF 数组在程序内部按照 `(z, y, x)` 索引；导出的点数据表使用 `(X, Y, Z)` 列。标签可在 JSON 配置文件中修改，但输入图像必须包含三个不同的相。
-
-### 处理流程
-
-1. 按可配置的三维体素数量阈值去除过小的水相和气相连通区域。
-2. 采用六邻域面连接识别水–气界面和固体–水界面体素。
-3. 将同时邻接另外两个相的水相体素识别为候选三相接触点。
-4. 根据邻域密度、各相体素数、局部相比例、界面支撑点、平面拟合质量和法向量方向过滤不可靠候选点。
-5. 使用 SVD 拟合局部界面平面，并按照 RMS 残差和奇异值比阈值筛选结果。
-6. 将水–气界面法向量定向为由水指向气体，将固体–水界面法向量定向为由固体指向水。在离散三相接触线上，探测方向可能进入第三相；程序默认保留原算法的相对回退定向规则，也可以在配置中关闭。
-7. 计算两个定向法向量之间的局部夹角并导出结果。
-
-### 环境要求
-
-- Python 3.8 或更高版本
-- NumPy
-- SciPy
-- pandas
-- Matplotlib
-- tifffile
-
-建议在虚拟环境中安装依赖：
-
-```bash
-python -m venv .venv
-python -m pip install -r requirements.txt
-```
-
-### 快速使用
-
-处理单个分割 TIFF 图像栈：
-
-```bash
-python contact_angle_extraction.py path/to/segmented_volume.tif --output-dir results
-```
-
-使用附带配置文件和可复现的随机种子：
-
-```bash
-python contact_angle_extraction.py path/to/segmented_volume.tif \
-  --output-dir results \
-  --config example_config.json \
-  --seed 42
-```
-
-批量处理目录中的 TIFF 文件：
-
-```bash
-python contact_angle_extraction.py path/to/tiff_directory \
-  --output-dir batch_results \
-  --recursive
-```
-
-程序默认保护已有输出。仅在确定需要替换时添加 `--overwrite`。
-
-### 参数配置
-
-所有相标签和质量控制阈值均由 `ContactAngleConfig` 定义，并可通过 [`example_config.json`](example_config.json) 覆盖。主要参数包括：
-
-| 参数 | 默认值 | 含义 |
-| --- | ---: | --- |
-| `min_water_component_voxels` | 50 | 保留的最小三维水相连通区域体素数 |
-| `min_gas_component_voxels` | 50 | 保留的最小三维气相连通区域体素数 |
-| `sphere_radius` | 15 | 计算局部相比例时使用的球形邻域半径 |
-| `patch_window_radius` | 4 | 局部界面拟合窗口的半宽 |
-| `min_patch_points` | 15 | 每个界面平面拟合所需的最少点数 |
-| `max_plane_rms` | 1.0 | 可接受的最大平面拟合 RMS 距离 |
-| `max_singular_value_ratio` | 0.3 | 可接受的最小/中间奇异值之比上限 |
-| `normal_probe_steps` | `[1, 2, 3]` | 确定界面法向量方向时使用的体素距离 |
-| `allow_third_phase_orientation_fallback` | `true` | 当探测方向穿过第三相时，是否保留原始法向量回退规则 |
-| `save_angle_map` | `true` | 是否导出仅在有效点记录角度的 float32 TIFF |
-
-这些阈值以体素为单位，因此会受到图像分辨率影响。对于新的 CT 分辨率或分割流程，应给出参数依据，并在必要时重新标定。
-
-### 输出文件
-
-每个输入图像会产生：
-
-- 包含 `(X, Y, Z)`、接触角及局部相比例的逐点 CSV；
-- 汇总统计 CSV；
-- 拒绝原因统计 CSV；
-- 接触角直方图 TIFF 及其数值 CSV；
-- 用于复现分析的实际配置 JSON；
-- 可选的压缩 NPZ，包含坐标、法向量、相比例和诊断点集合；
-- 可选的 float32 接触角图 TIFF，其尺寸与输入体数据一致。
-
-接触角图为 float32，可能明显大于 8 位分割图像。存储空间有限时，可将 `save_angle_map` 设为 `false`。
-
-### 数据
-
-关联数据集 *3D contact angle distribution* 已发布在 Figshare（[DOI：10.6084/m9.figshare.30885293.v1](https://doi.org/10.6084/m9.figshare.30885293.v1)，CC BY 4.0）。本代码仓库不存放研究图像数据。
-
-### 验证
-
-附带测试构建两个夹角已知为 90° 的正交平面界面，并验证从 TIFF 输入到结果输出的完整流程：
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-### 开源许可与引用
-
-本项目采用 [MIT License](LICENSE) 开源。如使用本仓库，请引用相关 SSRN 预印本和代码仓库；如使用了 Figshare 数据集，也请同时引用该数据集。
+Zhenqi Guo, Feiyan Jin, Kun Wang, Yajuan Zhuang, Si Suo, Sergio Andres Galindo Torres, and Liang Lei. *Contact angle extraction with geometrical and morphological constraints in 3D porous media*. Unpublished manuscript.
