@@ -1,9 +1,8 @@
 # Contact angle extraction with geometrical and morphological constraints in 3D porous media
 
-**V4.2 · English / 中文**
-This repository contains the Python source accompanying the revised manuscript of the same title. It measures local contact angles along the solid–liquid–gas contact line in segmented CT data. Comparing the geometrically computable and quality-controlled distributions shows how the choice of measurement sites affects the inferred wettability.
+This Python code measures local contact angles along solid–liquid–gas contact lines in segmented CT volumes. It exports both the geometrically computable angles and a quality-controlled subset for comparing wettability across samples.
 
-本仓库提供同名修订稿及补充材料（SI）中的 V4.2 Python 源码，用于测量已分割 CT 中固–液–气三相接触线上的局部接触角。比较几何可计算集合与质量筛选子集的角度分布，可分析测点选择对润湿性表征的影响。
+本程序沿分割 CT 体数据中的固–液–气三相接触线测量局部接触角，输出几何可计算的全部角度及其质量筛选子集，用于比较样品间的润湿性。
 
 ## Measurement / 测量方法
 
@@ -24,7 +23,7 @@ This repository contains the Python source accompanying the revised manuscript o
 Each raw candidate receives an independent `pass`, `fail` or `not_evaluated` for each criterion. Unavailable measurements can coexist with failures on the same candidate. Each paired `wg` / `sw` entry below counts twice (liquid–gas / solid–liquid).
 每个候选点的每项条件均独立记录通过、失败或不可评价。同一点可同时存在失败项和不可评价项。下表中每对 `wg` / `sw` 分别对应液–气和固–液界面，计作两项。
 
-| Criterion / 条件 | V4.2 default / 默认判据 |
+| Criterion / 条件 | Default / 默认判据 |
 |---|---|
 | `numerical_geometry` | Finite oriented angle (membership in G) / 有限定向夹角，定义 G |
 | `topology` | Six face neighbours include all three phases, excluding the centre / 中心之外的六个面邻居含三相 |
@@ -44,24 +43,18 @@ Each raw candidate receives an independent `pass`, `fail` or `not_evaluated` for
 
 ## Run one image / 运行单个图像
 
-The pinned dependencies were tested with 64-bit Python 3.8.2. From the repository directory, use a virtual environment and a new output folder. Replace the example TIFF path with your segmented image.
-固定依赖已在 64 位 Python 3.8.2 上验证。在仓库目录的虚拟环境中执行下列命令，将示例输入替换为实际 TIFF，结果目录须为新目录。
+In a virtual environment (tested with 64-bit Python 3.8.2), run the following from the repository directory. The requirements file pins NumPy, SciPy, pandas and tifffile. Supply your segmented TIFF and choose a new output directory for each run.
+
+在虚拟环境中从仓库目录运行以下命令。依赖文件固定了 NumPy、SciPy、pandas 和 tifffile 的版本，已用 64 位 Python 3.8.2 验证。将输入路径替换为自己的分割 TIFF，每次使用新的输出目录。
 
 ```sh
 python -m pip install -r requirements.txt
 python -c "from contact_angle_extraction import run_image; run_image('data/sample.tif', 'results/run01')"
-python -m unittest discover -s tests -v
 ```
 
-The unit tests generate two perpendicular interfaces and check a true angle of 90° (43 raw candidates, 33 in G, 13 in Q). To compare the independently extracted SI source and the repository on this model, run the command below with your copy of the SI. Add `--tiff data/sample.tif` to compare your own stack.
-测试现场构建两个垂直界面，验证 90° 已知角度，以及 43 个候选、33 个 G 点和 13 个 Q 点。下面的命令从本地 SI 独立提取源码并比较该模型的逐点结果。附加 `--tiff data/sample.tif` 可比较自己的图像。
+`run_image` uses the defaults listed in `example_config.json`, including all local fitting points (`max_plane_points: null`). To study a parameter change, load your configuration and call `calculate` directly.
 
-```sh
-python tests/compare_si.py "Supplementary Material_2026.11.20.docx"
-```
-
-`example_config.json` records every SI default, including `max_plane_points: null` (use all local points). `run_image` always uses `Parameters()`. For a sensitivity analysis, load an edited JSON into `Parameters` and call `calculate` directly. Save your configuration, input checksum, Python/package versions and Git commit alongside the outputs.
-`example_config.json` 列出 SI 全部默认值，`max_plane_points: null` 表示使用全部局部拟合点。`run_image` 固定使用默认参数。参数敏感性分析可按下例调用，并随结果保存实际配置、输入校验值、Python 及依赖版本和 Git 提交号。
+`run_image` 使用 `example_config.json` 所列的默认参数，其中 `max_plane_points: null` 表示使用全部局部拟合点。研究参数变化时，可按下例载入配置并调用 `calculate`。
 
 ```python
 import json
@@ -82,29 +75,25 @@ features, accepted, states, summary = calculate(tifffile.imread("data/sample.tif
 | `G.csv.gz`, `Q.csv.gz` | Feature rows in G and Q with the same coordinates and angles / 分别收录 G、Q 对应的特征行、坐标与角度 |
 | `summary.json` | G and Q counts, fractions of raw candidates, mean, median, population SD (ddof=0), quartiles, IQR, P05/P95 and fractions below 10° or above 170° / 两集合的数量、占原始候选比例、均值、中位数、总体标准差、四分位数及四分位距、P05/P95 和两端比例 |
 
-Normal components and centroid fields use **x, y, z** suffixes. Centroids and plane RMS use reference voxels, angles are in degrees, and phase fractions are dimensionless. For the SI state export, attach keys from the original, unsorted feature file **from the same run** before filtering or sorting. For Table 2, compute bias-corrected Fisher–Pearson skewness on Q as below. It is undefined for constant data or fewer than three points.
-法向量分量与质心字段后缀为 **x、y、z**，质心坐标与平面 RMS 使用参考体素，角度单位为度，相比例无量纲。状态表缺少 ID，请先从**同次运行、未经重排的完整特征表**附加键，再筛选或排序。Table 2 的校正 Fisher–Pearson 偏度可从 Q 计算，少于三个角或角度恒定时无定义。
+Normals and centroids use **x, y, z** component suffixes. Centroid coordinates and plane RMS are in reference voxels. Before filtering or sorting the state table, attach `candidate_id, z, y, x` from the same run’s unsorted feature table in the original row order. For Table 2, calculate adjusted skewness with `scipy.stats.skew(angles, bias=False)` on Q’s `contact_angle_degrees` when at least three values are present and the angles vary.
 
-```python
-from pathlib import Path
-import numpy as np
-import pandas as pd
-from scipy.stats import skew
+法向量和质心分量的后缀为 **x、y、z**，质心坐标及平面 RMS 以参考体素计。状态表按同次运行的原始特征表行序排列；筛选或排序前，先逐行附上后者的 `candidate_id, z, y, x`。复算 Table 2 时，若 Q 中有至少三个角且角度不全相同，可对 `contact_angle_degrees` 列调用 `scipy.stats.skew(angles, bias=False)` 获得校正偏度。
 
-out = Path("results/run01")
-keys = pd.read_csv(out / "candidate_features.csv.gz", usecols=["candidate_id", "z", "y", "x"])
-states = pd.read_csv(out / "criterion_states.csv.gz")
-assert len(keys) == len(states) and keys.candidate_id.is_unique
-keyed_states = pd.concat([keys, states], axis=1).set_index(["z", "y", "x"], verify_integrity=True)
-angles = pd.read_csv(out / "Q.csv.gz", usecols=["contact_angle_degrees"]).iloc[:, 0]
-adjusted_skew = skew(angles, bias=False) if len(angles) >= 3 and angles.nunique() > 1 else np.nan
+## Tests / 测试
+
+The tests generate perpendicular interfaces with a known 90° angle (43 candidates, 33 in G and 13 in Q). The optional second command compares the repository and Supplementary Material (SI) on this input, candidate by candidate. Supply your local SI document. Add `--tiff data/sample.tif` to compare another volume.
+
+测试生成夹角为 90° 的双界面，预期有 43 个候选点，其中 G 有 33 个、Q 有 13 个。可选的第二条命令从本地补充材料（SI）独立提取源码，逐点比较两份程序的输出。附加 `--tiff data/sample.tif` 可核对其他体数据。
+
+```sh
+python -m unittest discover -s tests -v
+python tests/compare_si.py "Supplementary Material_2026.11.20.docx"
 ```
 
-## Interpretation, data and citation / 适用范围、数据与引用
+## Research data and citation / 数据与引用
 
-Voxelisation, segmentation and curvature at the chosen fitting scale affect the inferred angle. Q describes the distribution among accepted sites. A candidate count is a count of voxels along contact lines. The support scales and cutoffs are the study settings. Transfer to a different resolution or segmentation requires checking their physical scale and the fraction of candidates retained. See manuscript §§2.3, 2.4 and 3.2 and SI Tables S1–S2 for rationale, limitations and related methods.
+For the measurement assumptions and choice of thresholds, see manuscript §§2.3–2.4 and SI Tables S1–S2. The spacing, fitting window and segmentation affect the inferred angles. Please cite the manuscript below and record the Git commit used for your analysis.
 
-体素化、分割质量及拟合尺度上的曲率都会影响角度。Q 描述通过筛选的测点分布，候选数量统计的是接触线上的体素数。将本研究的支撑尺度与阈值用于其他分辨率或分割方法时，需核对其物理尺度及候选保留比例。方法依据、局限和相关文献见正文 §§2.3、2.4、3.2 及 SI 表 S1–S2。
+测量假设与阈值选择见正文第 2.3–2.4 节和 SI 表 S1–S2。体素间距、拟合窗口和分割结果均会影响角度估计。欢迎引用以下稿件，并注明分析所用的 Git 提交号。[Research data on Figshare / 研究数据](https://figshare.com/articles/figure/3D_contact_angle_distribution_/30885293)
 
-If you use this code, please cite Guo and colleagues’ revised manuscript, *Contact angle extraction with geometrical and morphological constraints in 3D porous media*, and identify the software commit used. The earlier SSRN preprint is titled *Physics-constrained contact angle extraction in 3D porous media*. The legacy implementation is archived at commit `888a63d`.
-感谢使用本代码。引用时请注明 Guo 等人的上述修订稿及实际使用的提交号。SSRN 预印本沿用历史题名，历史实现可按提交号查阅。[Research data / 研究数据](https://figshare.com/articles/figure/3D_contact_angle_distribution_/30885293) · [Earlier SSRN preprint / 历史预印本](https://doi.org/10.2139/ssrn.6641861) · [Legacy software / 历史代码](https://github.com/Quincy-Zhenqi/Contact-angle-extraction-in-3D-porous-media/tree/888a63da642392db6efbe09a40b7f645633bfef5)
+Zhenqi Guo, Feiyan Jin, Kun Wang, Yajuan Zhuang, Si Suo, Sergio Andres Galindo Torres, and Liang Lei. *Contact angle extraction with geometrical and morphological constraints in 3D porous media*. Unpublished manuscript.
